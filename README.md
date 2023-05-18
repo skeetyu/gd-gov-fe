@@ -1,4 +1,4 @@
-# easyweb-fe
+# gd-gov-fe
 
 ## Project setup
 ```

@@ -1,14 +1,15 @@
 {
-  "name": "easyweb-fe",
+  "name": "gd_gov_fe",
   "version": "0.1.0",
   "private": true,
   "scripts": {
     "serve": "vue-cli-service serve",
-    "build": "vue-cli-service build",
-    "lint": "vue-cli-service lint"
+    "build": "vue-cli-service build"
   },
   "dependencies": {
+    "axios": "^0.24.0",
     "core-js": "^3.6.5",
+    "element-ui": "^2.15.13",
     "vue": "^2.6.11",
     "vue-router": "^3.2.0"
   },
