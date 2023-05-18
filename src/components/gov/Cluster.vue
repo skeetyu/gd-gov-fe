@@ -59,22 +59,15 @@
             </el-collapse-item>
 
             <el-collapse-item title="VirtualService信息" name="6">
-                <el-table :data="virtualService" max-height="250" :border="true">
-                    <el-table-column prop="metadata.name" label="VS名称" width="180px"></el-table-column>
-                    <el-table-column prop="metadata.namespace" label="命名空间" width="180px"></el-table-column>
-                    <el-table-column label="流量调度规则" width="240px">
-                        <el-button type="primary" plain size="small" @click="virtualServiceDialogVisible = true" icon="el-icon-tickets">查看详情</el-button>
-                        <el-button type="primary" plain size="small" @click="handleVirtualServiceConfigOpen" icon="el-icon-edit-outline">负载均衡</el-button>
-                    </el-table-column>
-                    <el-table-column prop="metadata.selfLink" label="完整描述"></el-table-column>
-                </el-table>
-                <el-dialog title="VirtualService流量调度规则" :visible.sync="virtualServiceDialogVisible" width="60%" height="30%" :before-close="handleDialogClose">
-                    <el-input v-model="virtualServiceStr" autosize type="textarea"></el-input>
+                <el-button type="primary" plain size="small" @click="handleVSYamlOpen" icon="el-icon-tickets" style="float: left;margin-bottom: 5px;">查看yaml配置</el-button>
+                <el-dialog title="VirtualService流量调度规则" :visible.sync="vsYamlVisible" width="60%" height="30%" :before-close="handleDialogClose">
+                    <el-input v-model="vsYamlStr" autosize type="textarea"></el-input>
                 </el-dialog>
-                <el-dialog title="VirtualService负载权重配置" :visible.sync="virtualServiceConfigVisible" width="60%" height="30%" :before-close="handleDialogClose">
+
+                <el-button type="primary" plain size="small" @click="handleVSConfigOpen" icon="el-icon-edit-outline" style="float: left; margin-left: 10px; margin-bottom: 5px;">负载均衡（流量比例配置）</el-button>
+                <el-dialog title="VirtualService负载权重配置" :visible.sync="vsConfigVisible" width="60%" height="30%" :before-close="handleConfigClose">
                     <el-button type="primary" plain size="small" @click="applyVirtualService" icon="el-icon-document-copy" style="float: left; margin-bottom: 5px;">保存配置</el-button>
-                    <el-button type="primary" plain size="small" @click="applyTemplateVirtualService" icon="el-icon-reading" style="float: left; margin-left:10px; margin-bottom: 5px;">一键生效模板配置</el-button>
-                    <el-table :data="virtualServiceConfig" max-height="250" :border="true">
+                    <el-table :data="vsConfig" max-height="250" :border="true">
                         <el-table-column prop="destination.host" label="Host信息" width="180px"></el-table-column>
                         <el-table-column prop="destination.port.number" label="端口" width="180px"></el-table-column>
                         <el-table-column prop="destination.subset" label="子集" width="180px"></el-table-column>
@@ -85,79 +78,101 @@
                         </el-table-column>
                     </el-table>
                 </el-dialog>
+                
+                <el-button type="primary" plain size="small" @click="applyTemplateVirtualService" v-if="clusterId == 1" icon="el-icon-reading" style="float: left; margin-left: 10px;  margin-bottom: 5px;">生成模板配置</el-button>
+                
+                <el-table :data="virtualService" max-height="250" :border="true">
+                    <el-table-column prop="metadata.name" label="VS名称" width="180px"></el-table-column>
+                    <el-table-column prop="metadata.namespace" label="命名空间" width="180px"></el-table-column>
+                    <el-table-column prop="spec.http[0].route.length" label="服务子集数量" width="180px"></el-table-column>
+                    <el-table-column prop="metadata.selfLink" label="完整描述"></el-table-column>
+                </el-table>
             </el-collapse-item>
 
             <el-collapse-item title="DestinationRule信息" name="7">
-                <el-table :data="destinationRule" max-height="250" :border="true">
-                    <el-table-column prop="metadata.name" label="DR名称" width="180px"></el-table-column>
-                    <el-table-column prop="metadata.namespace" label="命名空间" width="180px"></el-table-column>
-                    <el-table-column label="目标规则配置" width="240px">
-                        <el-button type="primary" plain size="small" @click="handleDestinationRuleConfigOpen" icon="el-icon-tickets">查看详细配置</el-button>
-                    </el-table-column>
-                    <el-table-column prop="metadata.selfLink" label="完整描述"></el-table-column>
-                </el-table>
-                <el-dialog title="DestinationRule配置详情" :visible.sync="destinationRuleDialogVisible" width="60%" :before-close="handleDialogClose">
-                        <el-button type="primary" plain size="small" @click="destinationRuleDemoteDialogVisible = true" icon="el-icon-tickets" style="float: left; margin-bottom: 5px;">查看完整配置</el-button>
-                        <el-dialog title="DestinationRule完整配置" :visible.sync="destinationRuleDemoteDialogVisible" append-to-body :before-close="handleDialogClose">
-                            <el-input v-model="destinationRuleStr" autosize type="textarea"></el-input>
-                        </el-dialog>
-                        <el-button type="primary" plain size="small" @click="handleDestinationRuleGlobalLoadBalancerConfigOpen" icon="el-icon-edit-outline" style="float: left; margin-left:10px; margin-bottom: 5px;">全局负载均衡策略配置</el-button>
-                        <el-dialog title="全局负载均衡策略配置" :visible.sync="destinationRuleGlobalLoadBalancerVisible" append-to-body :before-close="handleDialogClose">
-                            <el-radio v-model="destinationRuleGlobalLoadBalancerConfig" :label="0">关闭</el-radio>
-                            <el-radio v-model="destinationRuleGlobalLoadBalancerConfig" :label="1">ROUND_ROBIN</el-radio>
-                            <el-radio v-model="destinationRuleGlobalLoadBalancerConfig" :label="2">LEAST_CONN</el-radio>
-                            <el-radio v-model="destinationRuleGlobalLoadBalancerConfig" :label="3">RANDOM</el-radio>
-                            <el-radio v-model="destinationRuleGlobalLoadBalancerConfig" :label="4">PASSTHROUGH</el-radio>
-                            <el-button type="primary" plain size="small" @click="applyDestinationRuleGlobalLoadBalancer">生效</el-button>
-                        </el-dialog>
-                        <el-button type="primary" plain size="small" @click="applyTemplateDestinationRule" icon="el-icon-reading" style="float: left; margin-left:10px; margin-bottom: 5px;">一键生效模板配置</el-button>
-                        <el-table :data="destinationRuleConfig" :border="true">
-                            <el-table-column prop="name" label="子集名称" width="180px"></el-table-column>
-                            <el-table-column prop="labels.version" label="version标签" width="180px"></el-table-column>
+                <el-button type="primary" plain size="small" @click="handleDRYamlOpen" icon="el-icon-tickets" style="float: left; margin-bottom: 5px;">查看yaml配置</el-button>
+                <el-dialog title="DestinationRule完整配置" :visible.sync="drYamlVisible" :before-close="handleDialogClose">
+                    <el-input v-model="drYamlStr" autosize type="textarea"></el-input>
+                </el-dialog>
+
+                <el-button type="primary" plain size="small" @click="handleDRGlobalLoadBalancerConfigOpen" icon="el-icon-edit-outline" style="float: left; margin-left:10px; margin-bottom: 5px;">全局负载均衡策略配置</el-button>
+                <el-dialog title="全局负载均衡策略配置" :visible.sync="drGlobalLoadBalancerVisible" append-to-body :before-close="handleDialogClose">
+                    <el-radio v-model="drGlobalLoadBalancerConfig" :label="''">关闭</el-radio>
+                    <el-radio v-model="drGlobalLoadBalancerConfig" :label="'ROUND_ROBIN'">ROUND_ROBIN</el-radio>
+                    <el-radio v-model="drGlobalLoadBalancerConfig" :label="'LEAST_CONN'">LEAST_CONN</el-radio>
+                    <el-radio v-model="drGlobalLoadBalancerConfig" :label="'RANDOM'">RANDOM</el-radio>
+                    <el-radio v-model="drGlobalLoadBalancerConfig" :label="'PASSTHROUGH'">PASSTHROUGH</el-radio>
+                    <el-button type="primary" plain size="small" @click="handleDRGlobalLoadBalancerConfigDone">生效</el-button>
+                </el-dialog>
+
+                <el-button type="primary" plain size="small" @click="applyTemplateDestinationRule" v-if="clusterId == 1" icon="el-icon-reading" style="float: left; margin-left:10px; margin-bottom: 5px;">生成模板目标规则</el-button>
+
+                <!-- <el-button type="primary" plain size="small" @click="" v-if="clusterId == 1" icon="el-icon-reading" style="float: left; margin-left:10px; margin-bottom: 5px;">生成模板熔断配置</el-button>
+                <el-dialog title="全局负载均衡策略配置" :visible.sync="drTemplateFuseConfigVisible" :before-close="handleDialogClose">
+                    <el-radio v-model="drGlobalLoadBalancerConfig" :label="''">关闭</el-radio>
+                    <el-radio v-model="drGlobalLoadBalancerConfig" :label="'ROUND_ROBIN'">ROUND_ROBIN</el-radio>
+                    <el-radio v-model="drGlobalLoadBalancerConfig" :label="'LEAST_CONN'">LEAST_CONN</el-radio>
+                    <el-radio v-model="drGlobalLoadBalancerConfig" :label="'RANDOM'">RANDOM</el-radio>
+                    <el-radio v-model="drGlobalLoadBalancerConfig" :label="'PASSTHROUGH'">PASSTHROUGH</el-radio>
+                    <el-button type="primary" plain size="small" @click="handleDRGlobalLoadBalancerConfigDone">生效</el-button>
+                </el-dialog> -->
+
+                <el-table :data="destinationRule" max-height="500" :border="true">
+                    <el-table-column prop="metadata.name" label="DR名称" width="90px"></el-table-column>
+                    <el-table-column prop="metadata.namespace" label="命名空间" width="90px"></el-table-column>
+                    <el-table-column label="服务子集配置列表" width="720px">
+                        <el-table :data="destinationRule[0].spec.subsets" :border="true">
+                            <el-table-column prop="name" label="子集名称" width="90px"></el-table-column>
+                            <el-table-column prop="labels.version" label="version标签" width="120px"></el-table-column>
                             <el-table-column label="">
                                 <template slot-scope="scope">
-                                    <el-button type="primary" plain size="small" @click="handleDestinationRuleDemoteSubsetOverrideLoadBalancerOpen(scope.$index)" icon="el-icon-document-copy" style="float: left;">覆盖负载策略</el-button>
-                                    <el-dialog title="覆盖负载均衡策略配置" :visible.sync="destinationRuleDemoteSubsetLoadBalancerVisible" append-to-body :before-close="handleDialogClose">
-                                        <el-radio v-model="destinationRuleDemoteSubsetLoadBalancerConfig" :label="0">关闭</el-radio>
-                                        <el-radio v-model="destinationRuleDemoteSubsetLoadBalancerConfig" :label="1">ROUND_ROBIN</el-radio>
-                                        <el-radio v-model="destinationRuleDemoteSubsetLoadBalancerConfig" :label="2">LEAST_CONN</el-radio>
-                                        <el-radio v-model="destinationRuleDemoteSubsetLoadBalancerConfig" :label="3">RANDOM</el-radio>
-                                        <el-radio v-model="destinationRuleDemoteSubsetLoadBalancerConfig" :label="4">PASSTHROUGH</el-radio>
-                                        <el-button type="primary" plain size="small" @click="applyDestinationRuleOverrideLoadBalancer()">生效</el-button>
+                                    <el-button type="primary" plain size="small" @click="handleDROverrideLoadBalancerConfigOpen(scope.$index)" icon="el-icon-document-copy" style="float: left;">覆盖负载策略</el-button>
+                                    <el-dialog title="覆盖负载均衡策略配置" :visible.sync="drOverrideLoadBalancerVisible" append-to-body :before-close="handleDialogClose">
+                                        <el-radio v-model="drOverrideLoadBalancerConfig.policy" :label="''">关闭</el-radio>
+                                        <el-radio v-model="drOverrideLoadBalancerConfig.policy" :label="'ROUND_ROBIN'">ROUND_ROBIN</el-radio>
+                                        <el-radio v-model="drOverrideLoadBalancerConfig.policy" :label="'LEAST_CONN'">LEAST_CONN</el-radio>
+                                        <el-radio v-model="drOverrideLoadBalancerConfig.policy" :label="'RANDOM'">RANDOM</el-radio>
+                                        <el-radio v-model="drOverrideLoadBalancerConfig.policy" :label="'PASSTHROUGH'">PASSTHROUGH</el-radio>
+                                        <el-button type="primary" plain size="small" @click="handleDROverrideLoadBalancerConfigDone">生效</el-button>
                                     </el-dialog>
-                                    <el-button type="primary" plain size="small" v-if="scope.row.state" @click="handleDestinationRuleDemoteConfigOpen(scope.$index)" icon="el-icon-edit-outline" style="float: left; margin-left:10px">熔断配置</el-button>
-                                    <el-button type="primary" plain size="small" v-if="!scope.row.state" @click="handleDestinationRuleDemoteConfigOpen(scope.$index)" icon="el-icon-edit" style="float: left; margin-left:10px">开启熔断</el-button>
-                                    <el-dialog title="熔断配置" :visible.sync="destinationRuleDemoteConfigVisible" append-to-body :before-close="handleDialogClose">
-                                        <el-form :ref="destinationRuleDemoteConfigForm" :model="destinationRuleDemoteConfigForm" label-position="left" label-width="210px">
-                                            <el-form-item label="子集名称">{{ destinationRuleDemoteConfigForm.name }}</el-form-item>
-                                            <el-form-item label="version标签">{{ destinationRuleDemoteConfigForm.labels.version }}</el-form-item>
+
+                                    <el-button type="primary" plain size="small" v-if="scope.row.trafficPolicy.connectionPool || scope.row.trafficPolicy.outlierDetection" @click="handleDRSubsetFuseConfigOpen(scope.$index)" icon="el-icon-edit-outline" style="float: left; margin-left:10px">熔断配置</el-button>
+                                    <el-button type="primary" plain size="small" v-if="!scope.row.trafficPolicy.connectionPool && !scope.row.trafficPolicy.outlierDetection" @click="handleDRSubsetFuseConfigOpen(scope.$index)" icon="el-icon-edit" style="float: left; margin-left:10px">开启熔断</el-button>
+                                    <el-dialog title="熔断配置" :visible.sync="drSubsetFuseConfigVisible" append-to-body :before-close="handleDialogClose">
+                                        <el-form :ref="drSubsetFuseConfig" :model="drSubsetFuseConfig" label-position="left" label-width="210px">
+                                            <el-form-item label="子集名称">{{ drSubsetFuseConfig.name }}</el-form-item>
+                                            <el-form-item label="version标签">{{ drSubsetFuseConfig.labels.version }}</el-form-item>
                                             <el-form-item label="tcp最大连接数">
-                                                <el-input v-model="destinationRuleDemoteConfigForm.trafficPolicy.connectionPool.tcp.maxConnections" style="width: 80%"></el-input>
+                                                <el-input v-model="drSubsetFuseConfig.trafficPolicy.maxConnections" style="width: 80%"></el-input>
                                             </el-form-item>
-                                            <el-form-item label="tcp连接超时时间">
-                                                <el-input v-model="destinationRuleDemoteConfigForm.trafficPolicy.connectionPool.tcp.connectTimeout" style="width: 80%"></el-input>
+                                            <el-form-item label="tcp连接超时时间（单位：ms）">
+                                                <el-input v-model="drSubsetFuseConfig.trafficPolicy.connectTimeout" style="width: 80%"></el-input>
                                             </el-form-item>
                                             <el-form-item label="http1最大排队请求数">
-                                                <el-input v-model="destinationRuleDemoteConfigForm.trafficPolicy.connectionPool.http.http1MaxPendingRequests" style="width: 80%"></el-input>
+                                                <el-input v-model="drSubsetFuseConfig.trafficPolicy.http1MaxPendingRequests" style="width: 80%"></el-input>
                                             </el-form-item>
                                             <el-form-item label="http单个连接最大请求数量">
-                                                <el-input v-model="destinationRuleDemoteConfigForm.trafficPolicy.connectionPool.http.maxRequestsPerConnection" style="width: 80%"></el-input>
+                                                <el-input v-model="drSubsetFuseConfig.trafficPolicy.maxRequestsPerConnection" style="width: 80%"></el-input>
                                             </el-form-item>
                                             <el-form-item label="熔断检测中连续5xx错误码数量">
-                                                <el-input v-model="destinationRuleDemoteConfigForm.trafficPolicy.outlierDetection.consecutive5xxErrors" style="width: 80%"></el-input>
+                                                <el-input v-model="drSubsetFuseConfig.trafficPolicy.consecutive5xxErrors" style="width: 80%"></el-input>
                                             </el-form-item>
                                         </el-form>
-                                        <el-button type="primary" plain size="small" @click="applyDestinationRuleDemote" icon="el-icon-document-checked">生效</el-button>
+                                        <el-button type="primary" plain size="small" @click="handleDRSubsetFuseConfigDone" icon="el-icon-document-checked">生效</el-button>
                                     </el-dialog>
-                                    <el-button type="primary" plain size="small" v-if="scope.row.state" @click="handleDestinationRuleDemoteConfigOfSubsetDelete(scope.$index)" icon="el-icon-delete" style="float: left; margin-left:10px">关闭熔断</el-button>
-                                    <el-button type="primary" plain size="small" @click="handleDestinationRuleDemoteSubsetOpen(scope.$index)" icon="el-icon-tickets" style="float:left; margin-left:10px">查看完整配置</el-button>
-                                    <el-dialog title="完整配置" :visible.sync="destinationRuleDemoteSubsetDialogVisible" append-to-body :before-close="handleDialogClose">
-                                        <el-input v-model="destinationRuleDemoteSubsetStr" autosize type="textarea"></el-input>
+
+                                    <el-button type="primary" plain size="small" v-if="scope.row.trafficPolicy.connectionPool || scope.row.trafficPolicy.outlierDetection" @click="handleDRSubsetFuseConfigDelete(scope.$index)" icon="el-icon-delete" style="float: left; margin-left:10px">关闭熔断</el-button>
+                                    
+                                    <el-button type="primary" plain size="small" @click="handleDRSubsetYamlOpen(scope.$index)" icon="el-icon-tickets" style="float:left; margin-left:10px">查看完整配置</el-button>
+                                    <el-dialog title="完整配置" :visible.sync="drSubsetYamlVisible" append-to-body :before-close="handleDialogClose">
+                                        <el-input v-model="drSubsetYamlStr" autosize type="textarea"></el-input>
                                     </el-dialog>
                                 </template>
                             </el-table-column>
                         </el-table>
-                </el-dialog>
+                    </el-table-column>
+                    <el-table-column prop="metadata.selfLink" label="完整描述"></el-table-column>
+                </el-table>
             </el-collapse-item>
 
             <el-collapse-item title="限流配置列表" name="8">
@@ -494,6 +509,7 @@
                 ],
                 gatewayStr: '',
                 gatewayStrVisible: false,
+
                 virtualService: [
                     {
                         "metadata": {
@@ -552,7 +568,7 @@
                         }
                     }
                 ],
-                virtualServiceConfig: [
+                vsConfig: [
                     {
                         "destination": {
                             "host": "server",
@@ -584,9 +600,10 @@
                         "weight": 40
                     }
                 ],
-                virtualServiceStr: '',
-                virtualServiceDialogVisible: false,
-                virtualServiceConfigVisible: false,
+                vsYamlVisible: false,
+                vsYamlStr: '',
+                vsConfigVisible: false,
+
                 destinationRule: [
                     {
                         "metadata": {
@@ -601,7 +618,8 @@
                                     "labels": {
                                         "version": "v1"
                                     },
-                                    "name": "v1"
+                                    "name": "v1",
+                                    "trafficPolicy": {}
                                 },
                                 {
                                     "labels": {
@@ -654,149 +672,39 @@
                         }
                     }
                 ],
-                destinationRuleConfig: [
-                    {
-                        "labels": {
-                            "version": "v1"
-                        },
-                        "name": "v1",
-                        "state": false,
-                        "trafficPolicy": {
-                            "connectionPool": {
-                                "http": {
-                                    "http1MaxPendingRequests": 1,
-                                    "maxRequestsPerConnection": 1
-                                },
-                                "tcp": {
-                                    "connectTimeout": "30ms",
-                                    "maxConnections": 1,
-                                    "tcpKeepalive": {
-                                        "interval": "75s",
-                                        "time": "7200s"
-                                    }
-                                }
-                            },
-                            "outlierDetection": {
-                                "baseEjectionTime": "3m",
-                                "consecutive5xxErrors": 1,
-                                "interval": "1s",
-                                "maxEjectionPercent": 100
-                            },
-                            "loadBalancer": {
-                                "simple": "RANDOM"
-                            }
-                        }
-                    },
-                    {
-                        "labels": {
-                            "version": "v2"
-                        },
-                        "name": "v2",
-                        "state": false,
-                        "trafficPolicy": {
-                            "connectionPool": {
-                                "http": {
-                                    "http1MaxPendingRequests": 1,
-                                    "maxRequestsPerConnection": 1
-                                },
-                                "tcp": {
-                                    "connectTimeout": "30ms",
-                                    "maxConnections": 1,
-                                    "tcpKeepalive": {
-                                        "interval": "75s",
-                                        "time": "7200s"
-                                    }
-                                }
-                            },
-                            "outlierDetection": {
-                                "baseEjectionTime": "3m",
-                                "consecutive5xxErrors": 1,
-                                "interval": "1s",
-                                "maxEjectionPercent": 100
-                            },
-                            "loadBalancer": {
-                                "simple": "RANDOM"
-                            }
-                        }
-                    },
-                    {
-                        "labels": {
-                            "version": "v3"
-                        },
-                        "name": "v3",
-                        "state": true,
-                        "trafficPolicy": {
-                            "connectionPool": {
-                                "http": {
-                                    "http1MaxPendingRequests": 1,
-                                    "maxRequestsPerConnection": 1
-                                },
-                                "tcp": {
-                                    "connectTimeout": "30ms",
-                                    "maxConnections": 1,
-                                    "tcpKeepalive": {
-                                        "interval": "75s",
-                                        "time": "7200s"
-                                    }
-                                }
-                            },
-                            "outlierDetection": {
-                                "baseEjectionTime": "3m",
-                                "consecutive5xxErrors": 1,
-                                "interval": "1s",
-                                "maxEjectionPercent": 100
-                            },
-                            "loadBalancer": {
-                                "simple": "RANDOM"
-                            }
-                        }
-                    }
-                ],
-                destinationRuleStr: '',
-                destinationRuleGlobalLoadBalancerVisible: false,
-                destinationRuleGlobalLoadBalancer: '',
-                destinationRuleGlobalLoadBalancerConfig: '',
-                destinationRuleDialogVisible: false,
-                destinationRuleDemoteDialogVisible: false,
-                destinationRuleDemoteConfigVisible: false,
-                destinationRuleDemoteConfigForm: {
+                drYamlVisible: false,
+                drYamlStr: '',
+
+                drGlobalLoadBalancerVisible: false,
+                drGlobalLoadBalancerConfig: '',
+
+                drTemplateFuseConfigVisible: false,
+
+                drOverrideLoadBalancerVisible: false,
+                drOverrideLoadBalancerConfig: {
+                    "index": '',
+                    "policy": ''
+                },
+
+                drSubsetFuseConfig: {
+                    "index": '',
                     "labels": {
-                        "version": ''
+                        "version": ""
                     },
-                    "name": '',
-                    "state": '',
+                    "name": "",
                     "trafficPolicy": {
-                        "connectionPool": {
-                            "http": {
-                                "http1MaxPendingRequests": '',
-                                "maxRequestsPerConnection": ''
-                            },
-                            "tcp": {
-                                "connectTimeout": '',
-                                "maxConnections": '',
-                                "tcpKeepalive": {
-                                    "interval": "75s",
-                                    "time": "7200s"
-                                }
-                            }
-                        },
-                        "outlierDetection": {
-                            "baseEjectionTime": "3m",
-                            "consecutive5xxErrors": 1,
-                            "interval": "1s",
-                            "maxEjectionPercent": 100
-                        },
-                        "loadBalancer": {
-                            "simple": ''
-                        }
+                        "http1MaxPendingRequests": '',
+                        "maxRequestsPerConnection": '',
+                        "connectTimeout": '',
+                        "maxConnections": '',
+                        "consecutive5xxErrors": ''
                     }
                 },
-                destinationRuleDemoteSubsetDialogVisible: false,
-                destinationRuleDemoteSubsetStr: '',
-                destinationRuleDemoteSubsetLoadBalancerVisible: false,
-                destinationRuleDemoteSubsetLoadBalancerConfig: '',
-                destinationRuleCurrentSubsetIndex: '',
-                loadBalancerPolicy: ['', 'ROUND_ROBIN', 'LEAST_CONN', 'RANDOM', "PASSTHROUGH"],
+                drSubsetFuseConfigVisible: false,
+
+                drSubsetYamlVisible: false,
+                drSubsetYamlStr: '',
+
                 envoyFilters: [
                     {
                         "metadata": {
@@ -912,17 +820,15 @@
         methods: {
             init() {
                 this.clusterId = this.$route.query.clusterId
-                this.getPods()
-                this.getDeployments()
-                this.getStatefulSets()
-                this.getServices()
-                this.getGateway()
-                this.getVirtualService()
-                this.getDestinationRule()
-                this.getEnvoyFilters()
+                // this.getPods()
+                // this.getDeployments()
+                // this.getStatefulSets()
+                // this.getServices()
+                // this.getGateway()
+                // this.getVirtualService()
+                // this.getDestinationRule()
+                // this.getEnvoyFilters()
                 this.gatewayStr = JSON.stringify(this.gateway[0].spec, null, '\t')
-                this.virtualServiceStr = JSON.stringify(this.virtualService[0].spec, null, '\t')
-                this.destinationRuleStr = JSON.stringify(this.destinationRule[0].spec, null, '\t')
             },
             handleDialogClose(done) {
                 done();
@@ -934,96 +840,132 @@
                     })
                     .catch(_ => {});
             },
-            handleVirtualServiceConfigOpen() {
-                this.virtualServiceConfigVisible = true
-                this.virtualServiceConfig = JSON.parse(JSON.stringify(this.virtualService[0].spec.http[0].route))
+
+            handleVSConfigOpen() {
+                this.vsConfigVisible = true
+                this.vsConfig = JSON.parse(JSON.stringify(this.virtualService[0].spec.http[0].route))
             },
-            handleDestinationRuleConfigOpen() {
-                this.destinationRuleDialogVisible = true
-                for (let i = 0; i < this.destinationRule[0].spec.subsets.length; ++i) {
-                    this.destinationRuleConfig[i] = JSON.parse(JSON.stringify(this.destinationRule[0].spec.subsets[i]))
-                    if (this.destinationRule[0].spec.subsets[i].trafficPolicy && this.destinationRule[0].spec.subsets[i].trafficPolicy.connectionPool) {
-                        this.destinationRuleConfig[i].state = true
-                    } else {
-                        this.destinationRuleConfig[i].state = false
-                    }
-                }
-                if (this.destinationRule[0].spec.trafficPolicy) {
-                    var currentPolicy = this.destinationRule[0].spec.trafficPolicy.loadBalancer.simple
-                    for (let i = 0; i < this.loadBalancerPolicy.length; ++i) {
-                        if (this.loadBalancerPolicy[i] === currentPolicy) {
-                            this.destinationRuleGlobalLoadBalancer = i
-                        }
-                    }
+            handleVSYamlOpen() {
+                this.vsYamlVisible = true
+                this.vsYamlStr = JSON.stringify(this.virtualService[0], null, '\t')
+            },
+
+            handleDRYamlOpen() {
+                this.drYamlVisible = true
+                this.drYamlStr = JSON.stringify(this.destinationRule[0], null, '\t')
+            },
+            handleDRGlobalLoadBalancerConfigOpen( ) {
+                this.drGlobalLoadBalancerVisible = true
+                var spec = this.destinationRule[0].spec
+                if (spec.trafficPolicy) {
+                    this.drGlobalLoadBalancerConfig = spec.trafficPolicy.loadBalancer.simple
                 } else {
-                    this.destinationRuleGlobalLoadBalancer = 0
+                    this.drGlobalLoadBalancerConfig = ''
                 }
             },
-            handleDestinationRuleGlobalLoadBalancerConfigOpen( ) {
-                this.destinationRuleGlobalLoadBalancerVisible = true
-                this.destinationRuleGlobalLoadBalancerConfig = this.destinationRuleGlobalLoadBalancer
-            },
-            handleDestinationRuleDemoteSubsetOpen(index) {
-                this.destinationRuleDemoteSubsetDialogVisible = true
-                this.destinationRuleDemoteSubsetStr = JSON.stringify(this.destinationRuleConfig[index])
-            },
-            handleDestinationRuleDemoteConfigOfSubsetDelete(index) {
-                this.destinationRuleConfig[index].state = false
-                if (this.destinationRuleConfig[index].trafficPolicy) {
-                    if (this.destinationRuleConfig[index].trafficPolicy.connectionPool) {
-                        this.destinationRuleConfig[index].trafficPolicy.connectionPool = ''
-                        this.destinationRuleConfig[index].trafficPolicy.outlierDetection = ''
+            handleDRGlobalLoadBalancerConfigDone() {
+                var trafficPolicy = {
+                    "loadBalancer": {
+                        "simple": ""
                     }
                 }
+                trafficPolicy.loadBalancer.simple = this.drGlobalLoadBalancerConfig
+                this.destinationRule[0].spec.trafficPolicy = trafficPolicy
                 this.applyDestinationRule()
             },
-            handleDestinationRuleDemoteSubsetOverrideLoadBalancerOpen(index) {
-                this.destinationRuleDemoteSubsetLoadBalancerVisible = true
-                var localLoadBalancer = 0
-                if (this.destinationRuleConfig[index].trafficPolicy && this.destinationRuleConfig[index].trafficPolicy.loadBalancer) {
-                    for (let i = 0; i < this.loadBalancerPolicy.length; ++i) {
-                        if (this.loadBalancerPolicy[i] === this.destinationRuleConfig[index].trafficPolicy.loadBalancer.simple) {
-                            localLoadBalancer = i
+            handleDROverrideLoadBalancerConfigOpen(index) {
+                this.drOverrideLoadBalancerVisible = true
+                this.drOverrideLoadBalancerConfig.index = index
+                if (this.destinationRule[0].spec.subsets[index].trafficPolicy.loadBalancer) {
+                    this.drOverrideLoadBalancerConfig.policy = this.destinationRule[0].spec.subsets[index].trafficPolicy.loadBalancer.simple
+                }
+            },
+            handleDROverrideLoadBalancerConfigDone() {
+                var index = this.drOverrideLoadBalancerConfig.index
+                this.destinationRule[0].spec.subsets[index].trafficPolicy.loadBalancer.simple = this.drOverrideLoadBalancerConfig.policy 
+                this.applyDestinationRule()
+            },
+            handleDRSubsetFuseConfigOpen(index) {
+                this.drSubsetFuseConfigVisible = true
+
+                var subset = this.destinationRule[0].spec.subsets[index]
+                this.drSubsetFuseConfig.index = index
+                this.drSubsetFuseConfig.labels.version = subset.labels.version
+                this.drSubsetFuseConfig.name = subset.name
+                if (subset.trafficPolicy.connectionPool) {
+                    this.drSubsetFuseConfig.trafficPolicy.maxConnections = subset.trafficPolicy.connectionPool.tcp.maxConnections
+                    this.drSubsetFuseConfig.trafficPolicy.connectTimeout = subset.trafficPolicy.connectionPool.tcp.connectTimeout.substring(0, subset.trafficPolicy.connectionPool.tcp.connectTimeout - 2)
+                    this.drSubsetFuseConfig.trafficPolicy.http1MaxPendingRequests = subset.trafficPolicy.connectionPool.http.http1MaxPendingRequests
+                    this.drSubsetFuseConfig.trafficPolicy.maxRequestsPerConnection = subset.trafficPolicy.connectionPool.http.maxRequestsPerConnection
+                } else {
+                    this.drSubsetFuseConfig.trafficPolicy.maxConnections = ''
+                    this.drSubsetFuseConfig.trafficPolicy.connectTimeout = ''
+                    this.drSubsetFuseConfig.trafficPolicy.http1MaxPendingRequests = ''
+                    this.drSubsetFuseConfig.trafficPolicy.maxRequestsPerConnection = ''
+                }
+                
+                if (subset.trafficPolicy.outlierDetection) {
+                    this.drSubsetFuseConfig.trafficPolicy.consecutive5xxErrors = subset.trafficPolicy.outlierDetection.consecutive5xxErrors
+                } else {
+                    this.drSubsetFuseConfig.trafficPolicy.consecutive5xxErrors = ''
+                }
+            },
+            handleDRSubsetFuseConfigDone() {
+                var index = this.drSubsetFuseConfig.index
+                var subset = this.destinationRule[0].spec.subsets[0]
+
+                var connectionPool = {
+                    "http": {
+                        "http1MaxPendingRequests": '',
+                        "maxRequestsPerConnection": ''
+                    },
+                    "tcp": {
+                        "connectTimeout": '',
+                        "maxConnections": '',
+                        "tcpKeepalive": {
+                            "interval": "75s",
+                            "time": "7200s"
                         }
                     }
                 }
-                this.destinationRuleCurrentSubsetIndex = index
-                this.destinationRuleDemoteSubsetLoadBalancerConfig = localLoadBalancer
-            },
-            handleDestinationRuleDemoteConfigOpen(index) {
-                this.destinationRuleDemoteConfigVisible = true
-                this.destinationRuleCurrentSubsetIndex = index
-                var var1 = this.destinationRuleConfig[index]
-                this.destinationRuleDemoteConfigForm.name = var1.name
-                this.destinationRuleDemoteConfigForm.labels.version = var1.labels.version
-                if (var1.trafficPolicy) {
-                    if (var1.trafficPolicy.connectionPool) {
-                        this.destinationRuleDemoteConfigForm.state = true
-                        this.destinationRuleDemoteConfigForm.trafficPolicy.connectionPool.tcp.maxConnections = var1.trafficPolicy.connectionPool.tcp.maxConnections
-                        this.destinationRuleDemoteConfigForm.trafficPolicy.connectionPool.tcp.connectTimeout = var1.trafficPolicy.connectionPool.tcp.connectTimeout
-                        this.destinationRuleDemoteConfigForm.trafficPolicy.connectionPool.http.http1MaxPendingRequests = var1.trafficPolicy.connectionPool.http.http1MaxPendingRequests
-                        this.destinationRuleDemoteConfigForm.trafficPolicy.connectionPool.http.maxRequestsPerConnection = var1.trafficPolicy.connectionPool.http.maxRequestsPerConnection
-                    } else {
-                        this.destinationRuleDemoteConfigForm.state = false
-                        this.destinationRuleDemoteConfigForm.trafficPolicy.connectionPool.tcp.maxConnections = ''
-                        this.destinationRuleDemoteConfigForm.trafficPolicy.connectionPool.tcp.connectTimeout = ''
-                        this.destinationRuleDemoteConfigForm.trafficPolicy.connectionPool.http.http1MaxPendingRequests = ''
-                        this.destinationRuleDemoteConfigForm.trafficPolicy.connectionPool.http.maxRequestsPerConnection = ''
-                    }
-                    if (var1.trafficPolicy.loadBalancer) {
-                        this.destinationRuleDemoteConfigForm.trafficPolicy.loadBalancer.simple = var1.trafficPolicy.loadBalancer.simple
-                    } else {
-                        this.destinationRuleDemoteConfigForm.trafficPolicy.loadBalancer.simple = ''
-                    }
-                } else {                        
-                    this.destinationRuleDemoteConfigForm.state = false
-                    this.destinationRuleDemoteConfigForm.trafficPolicy.connectionPool.tcp.maxConnections = ''
-                    this.destinationRuleDemoteConfigForm.trafficPolicy.connectionPool.tcp.connectTimeout = ''
-                    this.destinationRuleDemoteConfigForm.trafficPolicy.connectionPool.http.http1MaxPendingRequests = ''
-                    this.destinationRuleDemoteConfigForm.trafficPolicy.connectionPool.http.maxRequestsPerConnection = ''
-                    this.destinationRuleDemoteConfigForm.trafficPolicy.loadBalancer.simple = ''
+                var trafficPolicy = this.drSubsetFuseConfig.trafficPolicy
+                connectionPool.tcp.maxConnections = trafficPolicy.maxConnections
+                connectionPool.tcp.connectTimeout = trafficPolicy.connectTimeout + 'ms'
+                connectionPool.http.http1MaxPendingRequests = trafficPolicy.http1MaxPendingRequests
+                connectionPool.http.maxRequestsPerConnection = trafficPolicy.maxRequestsPerConnection
+
+                var outlierDetection = {
+                    "baseEjectionTime": "3m",
+                    "consecutive5xxErrors": '',
+                    "interval": "1s",
+                    "maxEjectionPercent": 100
                 }
+                outlierDetection.consecutive5xxErrors = trafficPolicy.consecutive5xxErrors
+
+                subset.trafficPolicy.connectionPool = connectionPool
+                subset.trafficPolicy.outlierDetection = outlierDetection
+
+                this.applyDestinationRule()
             },
+            handleDRSubsetFuseConfigDelete(index) {
+                var subset = this.destinationRule[0].spec.subsets[index]
+                if (subset.trafficPolicy.connectionPool) {
+                    subset.trafficPolicy.connectionPool.tcp.connectTimeout = ''
+                    subset.trafficPolicy.connectionPool.tcp.maxConnections = ''
+                    subset.trafficPolicy.connectionPool.http.http1MaxPendingRequests = ''
+                    subset.trafficPolicy.connectionPool.http.maxRequestsPerConnection = ''
+                }
+                if (subset.trafficPolicy.outlierDetection){ 
+                    subset.trafficPolicy.outlierDetection.consecutive5xxErrors = ''
+                }
+
+                this.applyDestinationRule()
+            },
+            handleDRSubsetYamlOpen(index) {
+                this.drSubsetYamlVisible = true
+                this.drSubsetYamlStr = JSON.stringify(this.destinationRule[0].spec.subsets[index], null, '\t')
+            },
+            
             handleEnvoyFilterDialogOpen(index) {
                 this.envoyFilterDialogVisible = true
                 this.envoyFilterStr = JSON.stringify(this.envoyFilters[index], null, '\t')
@@ -1115,6 +1057,7 @@
                     }
                 })
             },
+
             getVirtualService() {
                 var _this = this
                 var url = '/virtualService?clusterId=' + _this.clusterId
@@ -1132,9 +1075,9 @@
                 var _this = this
                 var versions = [ ]
                 var weights = [ ]
-                for (let i = 0; i < _this.virtualServiceConfig.length; ++i) {
-                    const version = _this.virtualServiceConfig[i].destination.subset
-                    const weight = _this.virtualServiceConfig[i].weight
+                for (let i = 0; i < _this.vsConfig.length; ++i) {
+                    const version = _this.vsConfig[i].destination.subset
+                    const weight = _this.vsConfig[i].weight
                     versions[i] = version
                     weights[i] = weight
                 }
@@ -1145,23 +1088,26 @@
                     versions: versions,
                     weights: weights
                 }).then(successResponse => {
-                    if (successResponse.data.code === 200) {
+                    if (successResponse.data.code === 200 && successResponse.data.data === true) {
                         _this.$message.success('负载均衡配置成功！')
-                        _this.getVirtualService()
+                        
+                        // _this.vsConfig = JSON.parse(JSON.stringify(this.virtualService[0].spec.http[0].route))
+                        _this.virtualService[0].spec.http[0].route = JSON.parse(JSON.stringify(_this.vsConfig))
+                        // _this.getVirtualService()
                     } else if(successResponse.data.code === 400) {
                         _this.$message.warning(successResponse.data.message)
                     } else {
                         _this.$message.error('负载均衡配置出错！')
                     }
                 })
-                _this.handleVirtualServiceConfigOpen()
+                // _this.handleVSConfigOpen()
             },
             applyTemplateVirtualService() {
                 var _this = this
                 _this.$axios.post('virtualService/template', {
                     clusterId: _this.clusterId
                 }).then(successResponse => {
-                    if (successResponse.data.code === 200) {
+                    if (successResponse.data.code === 200 && successResponse.data.data === true) {
                         _this.$message.success('Virtual Service模板配置成功！')
                         _this.getVirtualService()
                     } else if(successResponse.data.code === 400) {
@@ -1170,8 +1116,8 @@
                         _this.$message.error('Virtual Service模板配置出错！')
                     }
                 })
-                _this.handleVirtualServiceConfigOpen()
             },
+
             getDestinationRule() {
                 var _this = this
                 var url = '/destinationRule?clusterId=' + _this.clusterId
@@ -1188,82 +1134,63 @@
             applyDestinationRule() {
                 var _this = this
                 var policies = []
-                for (let i = 0; i < _this.destinationRuleConfig.length; ++i) {
+                var subsets = _this.destinationRule[0].spec.subsets
+                for (let i = 0; i < subsets.length; ++i) {
+                    var subset = subsets[i]
                     var policy = {
                         "version": '',
-                        "state": '',
-                        "tcp_maxConnections": '',
-                        "tcp_connectTimeout": '',
-                        "http_http1MaxPendingRequests": '',
-                        "http_maxRequestPerConnection": '',
-                        "consecutive5xxErrors": '',
+                        "connectionPool": {
+                            "tcp_maxConnections": '',
+                            "tcp_connectTimeout": '',
+                            "http_http1MaxPendingRequests": '',
+                            "http_maxRequestPerConnection": ''
+                        },
+                        "outlierDetection": {
+                            "consecutive5xxErrors": ''
+                        },
                         "loadBalancer": ''
                     }
-                    policy.version = _this.destinationRuleConfig[i].labels.version
-                    policy.state = _this.destinationRuleConfig[i].state
-                    if (_this.destinationRuleConfig[i].trafficPolicy) {
-                        if (_this.destinationRuleConfig[i].trafficPolicy.loadBalancer) {
-                            var currentPolicy = _this.destinationRuleConfig[i].trafficPolicy.loadBalancer.simple
-                            policy.loadBalancer = 0
-                            for (let i = 0; i < _this.loadBalancerPolicy.length; ++i) {
-                                if (currentPolicy === _this.loadBalancerPolicy[i]) {
-                                    policy.loadBalancer = i
-                                }
-                            }
-                        }
-                        if (_this.destinationRuleConfig[i].state) {
-                            policy.tcp_maxConnections = _this.destinationRuleConfig[i].trafficPolicy.connectionPool.tcp.maxConnections
-                            policy.tcp_connectTimeout = _this.destinationRuleConfig[i].trafficPolicy.connectionPool.tcp.connectTimeout.substring(0, _this.destinationRuleConfig[i].trafficPolicy.connectionPool.tcp.connectTimeout.length - 2)
-                            policy.http_http1MaxPendingRequests = _this.destinationRuleConfig[i].trafficPolicy.connectionPool.http.http1MaxPendingRequests
-                            policy.http_maxRequestPerConnection = _this.destinationRuleConfig[i].trafficPolicy.connectionPool.http.maxRequestsPerConnection
-                            policy.consecutive5xxErrors = _this.destinationRuleConfig[i].trafficPolicy.outlierDetection.consecutive5xxErrors
-                        }
+                    policy.version = subset.labels.version
+                    var trafficPolicy = subset.trafficPolicy
+                    if (trafficPolicy.connectionPool) {
+                        policy.connectionPool.tcp_maxConnections = trafficPolicy.connectionPool.tcp.maxConnections
+                        policy.connectionPool.tcp_connectTimeout = trafficPolicy.connectionPool.tcp.connectTimeout.substring(0, trafficPolicy.connectionPool.tcp.connectTimeout.length - 2)
+                        policy.connectionPool.http_http1MaxPendingRequests = trafficPolicy.connectionPool.http.http1MaxPendingRequests
+                        policy.connectionPool.http_maxRequestPerConnection = trafficPolicy.connectionPool.http.maxRequestsPerConnection
                     }
+                    if (trafficPolicy.outlierDetection) policy.outlierDetection = trafficPolicy.outlierDetection
+                    if (trafficPolicy.loadBalancer) policy.loadBalancer = trafficPolicy.loadBalancer.simple
                     policies[i] = policy
                 }
+
+                var globalLoadBalancer = ''
+                if (_this.destinationRule[0].spec.trafficPolicy) {
+                    globalLoadBalancer = _this.destinationRule[0].spec.trafficPolicy.loadBalancer.simple
+                }
+
                 _this.$axios.post('destinationRule/apply', {
                     clusterId: _this.clusterId,
                     namespace: _this.destinationRule[0].metadata.namespace,
                     drName: _this.destinationRule[0].metadata.name,
-                    globalLoadBalancer: _this.destinationRuleGlobalLoadBalancer,
+                    globalLoadBalancer: globalLoadBalancer,
                     policies: policies
                 }).then(successResponse => {
-                    if (successResponse.data.code === 200) {
+                    if (successResponse.data.code === 200 && successResponse.data.data === true) {
                         _this.$message.success('配置成功！')
-                        _this.getDestinationRule()
+                        // _this.getDestinationRule()
                     } else if(successResponse.data.code === 400) {
                         _this.$message.warning(successResponse.data.message)
                     } else {
                         _this.$message.error('配置出错！')
                     }
                 })
-                _this.handleDestinationRuleConfigOpen()
-            },
-            applyDestinationRuleGlobalLoadBalancer() {
-                this.destinationRuleGlobalLoadBalancer = this.destinationRuleGlobalLoadBalancerConfig
-                this.applyDestinationRule()
-            },
-            applyDestinationRuleOverrideLoadBalancer() {
-                var index = this.destinationRuleCurrentSubsetIndex
-                var trafficPolicy = {
-                    "loadBalancer": {
-                        "simple" : this.loadBalancerPolicy[this.destinationRuleDemoteSubsetLoadBalancerConfig]
-                    }
-                }
-                this.destinationRuleConfig[index].trafficPolicy = trafficPolicy
-                this.applyDestinationRule()
-            },
-            applyDestinationRuleDemote() {
-                var index = this.destinationRuleCurrentSubsetIndex
-                this.destinationRuleConfig[index] = this.destinationRuleDemoteConfigForm
-                this.applyDestinationRule()
             },
             applyTemplateDestinationRule() {
                 var _this = this
                 _this.$axios.post('destinationRule/template', {
                     clusterId: _this.clusterId
                 }).then(successResponse => {
-                    if (successResponse.data.code === 200) {
+                    if (successResponse.data.code === 200 && successResponse.data.data === true) {
                         _this.$message.success('Destination Rule模板配置成功！')
                         _this.getDestinationRule()
                     } else if(successResponse.data.code === 400) {
@@ -1274,6 +1201,7 @@
                 })
                 _this.handleDestinationRuleConfigOpen()
             },
+
             getEnvoyFilters() {
                 var _this = this
                 var url = '/envoyFilters?clusterId=' + _this.clusterId
