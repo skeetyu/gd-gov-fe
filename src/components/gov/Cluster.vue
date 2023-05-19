@@ -96,7 +96,7 @@
                 </el-dialog>
 
                 <el-button type="primary" plain size="small" @click="handleDRGlobalLoadBalancerConfigOpen" icon="el-icon-edit-outline" style="float: left; margin-left:10px; margin-bottom: 5px;">全局负载均衡策略配置</el-button>
-                <el-dialog title="全局负载均衡策略配置" :visible.sync="drGlobalLoadBalancerVisible" append-to-body :before-close="handleDialogClose">
+                <el-dialog title="全局负载均衡策略配置" :visible.sync="drGlobalLoadBalancerVisible" :before-close="handleDialogClose">
                     <el-radio v-model="drGlobalLoadBalancerConfig" :label="''">关闭</el-radio>
                     <el-radio v-model="drGlobalLoadBalancerConfig" :label="'ROUND_ROBIN'">ROUND_ROBIN</el-radio>
                     <el-radio v-model="drGlobalLoadBalancerConfig" :label="'LEAST_CONN'">LEAST_CONN</el-radio>
@@ -107,15 +107,22 @@
 
                 <el-button type="primary" plain size="small" @click="applyTemplateDestinationRule" v-if="clusterId == 1" icon="el-icon-reading" style="float: left; margin-left:10px; margin-bottom: 5px;">生成模板目标规则</el-button>
 
-                <!-- <el-button type="primary" plain size="small" @click="" v-if="clusterId == 1" icon="el-icon-reading" style="float: left; margin-left:10px; margin-bottom: 5px;">生成模板熔断配置</el-button>
-                <el-dialog title="全局负载均衡策略配置" :visible.sync="drTemplateFuseConfigVisible" :before-close="handleDialogClose">
-                    <el-radio v-model="drGlobalLoadBalancerConfig" :label="''">关闭</el-radio>
-                    <el-radio v-model="drGlobalLoadBalancerConfig" :label="'ROUND_ROBIN'">ROUND_ROBIN</el-radio>
-                    <el-radio v-model="drGlobalLoadBalancerConfig" :label="'LEAST_CONN'">LEAST_CONN</el-radio>
-                    <el-radio v-model="drGlobalLoadBalancerConfig" :label="'RANDOM'">RANDOM</el-radio>
-                    <el-radio v-model="drGlobalLoadBalancerConfig" :label="'PASSTHROUGH'">PASSTHROUGH</el-radio>
-                    <el-button type="primary" plain size="small" @click="handleDRGlobalLoadBalancerConfigDone">生效</el-button>
-                </el-dialog> -->
+                <el-button type="primary" plain size="small" @click="handleDRTemplateFuseConfigOpen" v-if="clusterId == 1" icon="el-icon-reading" style="float: left; margin-left:10px; margin-bottom: 5px;">生成模板熔断配置</el-button>
+                <el-dialog title="模板熔断策略配置" :visible.sync="drTemplateFuseConfigVisible" :before-close="handleDRTemplateFuseConfigClose">
+                    <div style="height: 150px;">
+                        <el-select v-model="drTemplateFuseConfig.index" placeholder="服务子集" style="float: left;">
+                            <el-option
+                                v-for="item in destinationRule[0].spec.subsets" :key="item.name" :label="item.name" :value="item.name">
+                            </el-option>
+                        </el-select>
+                        <el-select v-model="drTemplateFuseConfig.policy" placeholder="熔断等级" style="float: left; margin-left: 20px;">
+                            <el-option
+                                v-for="item in drTemplateFusePolicy" :key="item.level" :label="item.description" :value="item.level">
+                            </el-option>
+                        </el-select>
+                        <el-button type="primary" plain size="small" v-if="clusterId == 1" @click="handleDRTemplateFuseConfigDone" style="float: left; margin-left: 20px;">生效</el-button>
+                    </div>
+                </el-dialog>
 
                 <el-table :data="destinationRule" max-height="500" :border="true">
                     <el-table-column prop="metadata.name" label="DR名称" width="90px"></el-table-column>
@@ -136,8 +143,8 @@
                                         <el-button type="primary" plain size="small" @click="handleDROverrideLoadBalancerConfigDone">生效</el-button>
                                     </el-dialog>
 
-                                    <el-button type="primary" plain size="small" v-if="scope.row.trafficPolicy.connectionPool || scope.row.trafficPolicy.outlierDetection" @click="handleDRSubsetFuseConfigOpen(scope.$index)" icon="el-icon-edit-outline" style="float: left; margin-left:10px">熔断配置</el-button>
-                                    <el-button type="primary" plain size="small" v-if="!scope.row.trafficPolicy.connectionPool && !scope.row.trafficPolicy.outlierDetection" @click="handleDRSubsetFuseConfigOpen(scope.$index)" icon="el-icon-edit" style="float: left; margin-left:10px">开启熔断</el-button>
+                                    <el-button type="primary" plain size="small" v-if="isFuseOpen(scope.row)" @click="handleDRSubsetFuseConfigOpen(scope.$index)" icon="el-icon-edit-outline" style="float: left; margin-left:10px">熔断配置</el-button>
+                                    <el-button type="primary" plain size="small" v-if="!isFuseOpen(scope.row)" @click="handleDRSubsetFuseConfigOpen(scope.$index)" icon="el-icon-edit" style="float: left; margin-left:10px">开启熔断</el-button>
                                     <el-dialog title="熔断配置" :visible.sync="drSubsetFuseConfigVisible" append-to-body :before-close="handleDialogClose">
                                         <el-form :ref="drSubsetFuseConfig" :model="drSubsetFuseConfig" label-position="left" label-width="210px">
                                             <el-form-item label="子集名称">{{ drSubsetFuseConfig.name }}</el-form-item>
@@ -148,20 +155,36 @@
                                             <el-form-item label="tcp连接超时时间（单位：ms）">
                                                 <el-input v-model="drSubsetFuseConfig.trafficPolicy.connectTimeout" style="width: 80%"></el-input>
                                             </el-form-item>
+                                            <el-form-item label="tcp最大重试次数*">
+                                                <el-input v-model="drSubsetFuseConfig.trafficPolicy.maxRetries" style="width: 80%"></el-input>
+                                            </el-form-item>
                                             <el-form-item label="http1最大排队请求数">
                                                 <el-input v-model="drSubsetFuseConfig.trafficPolicy.http1MaxPendingRequests" style="width: 80%"></el-input>
                                             </el-form-item>
                                             <el-form-item label="http单个连接最大请求数量">
                                                 <el-input v-model="drSubsetFuseConfig.trafficPolicy.maxRequestsPerConnection" style="width: 80%"></el-input>
                                             </el-form-item>
-                                            <el-form-item label="熔断检测中连续5xx错误码数量">
+                                            
+                                            <el-form-item label="连续错误次数*">
+                                                <el-input v-model="drSubsetFuseConfig.trafficPolicy.consecutiveErrors" style="width: 80%"></el-input>
+                                            </el-form-item>
+                                            <el-form-item label="连续5xx错误码数量*">
                                                 <el-input v-model="drSubsetFuseConfig.trafficPolicy.consecutive5xxErrors" style="width: 80%"></el-input>
+                                            </el-form-item>
+                                            <el-form-item label="最小熔断时间（单位：s）*">
+                                                <el-input v-model="drSubsetFuseConfig.trafficPolicy.baseEjectionTime" style="width: 80%"></el-input>
+                                            </el-form-item>
+                                            <el-form-item label="熔断时间间隔（单位：s）*">
+                                                <el-input v-model="drSubsetFuseConfig.trafficPolicy.interval" style="width: 80%"></el-input>
+                                            </el-form-item>
+                                            <el-form-item label="最大熔断比例*">
+                                                <el-input v-model="drSubsetFuseConfig.trafficPolicy.maxEjectionPercent" style="width: 80%"></el-input>
                                             </el-form-item>
                                         </el-form>
                                         <el-button type="primary" plain size="small" @click="handleDRSubsetFuseConfigDone" icon="el-icon-document-checked">生效</el-button>
                                     </el-dialog>
 
-                                    <el-button type="primary" plain size="small" v-if="scope.row.trafficPolicy.connectionPool || scope.row.trafficPolicy.outlierDetection" @click="handleDRSubsetFuseConfigDelete(scope.$index)" icon="el-icon-delete" style="float: left; margin-left:10px">关闭熔断</el-button>
+                                    <el-button type="primary" plain size="small" v-if="isFuseOpen(scope.row)" @click="handleDRSubsetFuseConfigDelete(scope.$index)" icon="el-icon-delete" style="float: left; margin-left:10px">关闭熔断</el-button>
                                     
                                     <el-button type="primary" plain size="small" @click="handleDRSubsetYamlOpen(scope.$index)" icon="el-icon-tickets" style="float:left; margin-left:10px">查看完整配置</el-button>
                                     <el-dialog title="完整配置" :visible.sync="drSubsetYamlVisible" append-to-body :before-close="handleDialogClose">
@@ -641,7 +664,8 @@
                                         "connectionPool": {
                                             "http": {
                                                 "http1MaxPendingRequests": 1,
-                                                "maxRequestsPerConnection": 1
+                                                "maxRequestsPerConnection": 1,
+                                                "maxRetries": 5
                                             },
                                             "tcp": {
                                                 "connectTimeout": "30ms",
@@ -653,10 +677,11 @@
                                             }
                                         },
                                         "outlierDetection": {
-                                            "baseEjectionTime": "3m",
-                                            "consecutive5xxErrors": 1,
-                                            "interval": "1s",
-                                            "maxEjectionPercent": 100
+                                            "baseEjectionTime": "30s",
+                                            "consecutiveErrors": 5,
+                                            "consecutive5xxErrors": 5,
+                                            "interval": "10s",
+                                            "maxEjectionPercent": 80,
                                         },
                                         "loadBalancer": {
                                             "simple": "RANDOM"
@@ -672,6 +697,7 @@
                         }
                     }
                 ],
+                // destinationRule: [],
                 drYamlVisible: false,
                 drYamlStr: '',
 
@@ -679,6 +705,24 @@
                 drGlobalLoadBalancerConfig: '',
 
                 drTemplateFuseConfigVisible: false,
+                drTemplateFuseConfig: {
+                    "index": '',
+                    "policy": ''
+                },
+                drTemplateFusePolicy: [
+                    {
+                        "level": "0",
+                        "description": "强（对事务处理能力要求高的重要业务）"
+                    },
+                    {
+                        "level": "1",
+                        "description": "中（对事务处理能力有一定要求的基础业务）"
+                    },
+                    {
+                        "level": "2",
+                        "description": "弱（次要业务）"
+                    },
+                ],
 
                 drOverrideLoadBalancerVisible: false,
                 drOverrideLoadBalancerConfig: {
@@ -697,7 +741,13 @@
                         "maxRequestsPerConnection": '',
                         "connectTimeout": '',
                         "maxConnections": '',
-                        "consecutive5xxErrors": ''
+                        "maxRetries": '',
+                    
+                        "consecutive5xxErrors": '',
+                        "consecutiveErrors": '',
+                        "baseEjectionTime": '',
+                        "interval": '',
+                        "maxEjectionPercent": ''
                     }
                 },
                 drSubsetFuseConfigVisible: false,
@@ -820,15 +870,15 @@
         methods: {
             init() {
                 this.clusterId = this.$route.query.clusterId
-                // this.getPods()
-                // this.getDeployments()
-                // this.getStatefulSets()
-                // this.getServices()
-                // this.getGateway()
-                // this.getVirtualService()
-                // this.getDestinationRule()
-                // this.getEnvoyFilters()
-                this.gatewayStr = JSON.stringify(this.gateway[0].spec, null, '\t')
+                this.getPods()
+                this.getDeployments()
+                this.getStatefulSets()
+                this.getServices()
+                this.getGateway()
+                this.getVirtualService()
+                this.getDestinationRule()
+                this.getEnvoyFilters()
+                this.$forceUpdate()
             },
             handleDialogClose(done) {
                 done();
@@ -885,6 +935,18 @@
                 this.destinationRule[0].spec.subsets[index].trafficPolicy.loadBalancer.simple = this.drOverrideLoadBalancerConfig.policy 
                 this.applyDestinationRule()
             },
+            handleDRTemplateFuseConfigOpen() {
+                this.drTemplateFuseConfigVisible = true
+            },
+            handleDRTemplateFuseConfigClose() {
+                this.drTemplateFuseConfigVisible = false
+                this.drTemplateFuseConfig.index = ''
+                this.drTemplateFuseConfig.policy = ''
+            },
+            handleDRTemplateFuseConfigDone() {
+                this.applyTemplateFusePolicy()
+            },
+
             handleDRSubsetFuseConfigOpen(index) {
                 this.drSubsetFuseConfigVisible = true
 
@@ -892,58 +954,76 @@
                 this.drSubsetFuseConfig.index = index
                 this.drSubsetFuseConfig.labels.version = subset.labels.version
                 this.drSubsetFuseConfig.name = subset.name
-                if (subset.trafficPolicy.connectionPool) {
+                if (subset.trafficPolicy && subset.trafficPolicy.connectionPool) {
                     this.drSubsetFuseConfig.trafficPolicy.maxConnections = subset.trafficPolicy.connectionPool.tcp.maxConnections
-                    this.drSubsetFuseConfig.trafficPolicy.connectTimeout = subset.trafficPolicy.connectionPool.tcp.connectTimeout.substring(0, subset.trafficPolicy.connectionPool.tcp.connectTimeout - 2)
+                    this.drSubsetFuseConfig.trafficPolicy.connectTimeout = subset.trafficPolicy.connectionPool.tcp.connectTimeout.substring(0, subset.trafficPolicy.connectionPool.tcp.connectTimeout.length - 2)
                     this.drSubsetFuseConfig.trafficPolicy.http1MaxPendingRequests = subset.trafficPolicy.connectionPool.http.http1MaxPendingRequests
                     this.drSubsetFuseConfig.trafficPolicy.maxRequestsPerConnection = subset.trafficPolicy.connectionPool.http.maxRequestsPerConnection
+                    this.drSubsetFuseConfig.trafficPolicy.maxRetries = subset.trafficPolicy.connectionPool.tcp.maxRetries
                 } else {
                     this.drSubsetFuseConfig.trafficPolicy.maxConnections = ''
                     this.drSubsetFuseConfig.trafficPolicy.connectTimeout = ''
                     this.drSubsetFuseConfig.trafficPolicy.http1MaxPendingRequests = ''
                     this.drSubsetFuseConfig.trafficPolicy.maxRequestsPerConnection = ''
+                    this.drSubsetFuseConfig.trafficPolicy.maxRetries = ''
                 }
                 
-                if (subset.trafficPolicy.outlierDetection) {
+                if (subset.trafficPolicy && subset.trafficPolicy.outlierDetection) {
                     this.drSubsetFuseConfig.trafficPolicy.consecutive5xxErrors = subset.trafficPolicy.outlierDetection.consecutive5xxErrors
+                    this.drSubsetFuseConfig.trafficPolicy.consecutiveErrors = subset.trafficPolicy.outlierDetection.consecutiveErrors
+                    this.drSubsetFuseConfig.trafficPolicy.baseEjectionTime = subset.trafficPolicy.outlierDetection.baseEjectionTime.substring(0, subset.trafficPolicy.outlierDetection.baseEjectionTime.length - 1)
+                    this.drSubsetFuseConfig.trafficPolicy.interval = subset.trafficPolicy.outlierDetection.interval.substring(0, subset.trafficPolicy.outlierDetection.interval.length - 1)
+                    this.drSubsetFuseConfig.trafficPolicy.maxEjectionPercent = subset.trafficPolicy.outlierDetection.maxEjectionPercent
                 } else {
                     this.drSubsetFuseConfig.trafficPolicy.consecutive5xxErrors = ''
+                    this.drSubsetFuseConfig.trafficPolicy.consecutiveErrors = ''
+                    this.drSubsetFuseConfig.trafficPolicy.baseEjectionTime = ''
+                    this.drSubsetFuseConfig.trafficPolicy.interval = ''
+                    this.drSubsetFuseConfig.trafficPolicy.maxEjectionPercent = ''
                 }
             },
             handleDRSubsetFuseConfigDone() {
                 var index = this.drSubsetFuseConfig.index
-                var subset = this.destinationRule[0].spec.subsets[0]
+                var subset = this.destinationRule[0].spec.subsets[index]
 
                 var connectionPool = {
                     "http": {
                         "http1MaxPendingRequests": '',
-                        "maxRequestsPerConnection": ''
+                        "maxRequestsPerConnection": '',
+                        "maxRetries": ''
                     },
                     "tcp": {
                         "connectTimeout": '',
-                        "maxConnections": '',
-                        "tcpKeepalive": {
-                            "interval": "75s",
-                            "time": "7200s"
-                        }
+                        "maxConnections": ''
                     }
                 }
                 var trafficPolicy = this.drSubsetFuseConfig.trafficPolicy
                 connectionPool.tcp.maxConnections = trafficPolicy.maxConnections
                 connectionPool.tcp.connectTimeout = trafficPolicy.connectTimeout + 'ms'
+                connectionPool.http.maxRetries = trafficPolicy.maxRetries
                 connectionPool.http.http1MaxPendingRequests = trafficPolicy.http1MaxPendingRequests
                 connectionPool.http.maxRequestsPerConnection = trafficPolicy.maxRequestsPerConnection
 
                 var outlierDetection = {
-                    "baseEjectionTime": "3m",
+                    "consecutiveErrors": '',
+                    "baseEjectionTime": '',
                     "consecutive5xxErrors": '',
-                    "interval": "1s",
-                    "maxEjectionPercent": 100
+                    "interval": '',
+                    "maxEjectionPercent": ''
                 }
                 outlierDetection.consecutive5xxErrors = trafficPolicy.consecutive5xxErrors
+                outlierDetection.consecutiveErrors = trafficPolicy.consecutiveErrors
+                outlierDetection.baseEjectionTime = trafficPolicy.baseEjectionTime
+                outlierDetection.interval = trafficPolicy.interval
+                outlierDetection.maxEjectionPercent = trafficPolicy.maxEjectionPercent
 
-                subset.trafficPolicy.connectionPool = connectionPool
-                subset.trafficPolicy.outlierDetection = outlierDetection
+                var myTrafficPolicy = {
+                    "connectionPool": { },
+                    "outlierDetection": { }
+                }
+                myTrafficPolicy.connectionPool = connectionPool
+                myTrafficPolicy.outlierDetection = outlierDetection
+                subset.trafficPolicy = myTrafficPolicy
 
                 this.applyDestinationRule()
             },
@@ -954,9 +1034,14 @@
                     subset.trafficPolicy.connectionPool.tcp.maxConnections = ''
                     subset.trafficPolicy.connectionPool.http.http1MaxPendingRequests = ''
                     subset.trafficPolicy.connectionPool.http.maxRequestsPerConnection = ''
+                    subset.trafficPolicy.connectionPool.http.maxRetries = ''
                 }
                 if (subset.trafficPolicy.outlierDetection){ 
+                    subset.trafficPolicy.outlierDetection.consecutiveErrors = ''
                     subset.trafficPolicy.outlierDetection.consecutive5xxErrors = ''
+                    subset.trafficPolicy.outlierDetection.baseEjectionTime = ''
+                    subset.trafficPolicy.outlierDetection.interval = ''
+                    subset.trafficPolicy.outlierDetection.maxEjectionPercent = ''
                 }
 
                 this.applyDestinationRule()
@@ -992,6 +1077,15 @@
                 this.envoyFilterConfigForm.spec.configPatches[0].patch.value.typed_config.value.token_bucket.max_tokens = ''
                 this.envoyFilterConfigForm.spec.configPatches[0].patch.value.typed_config.value.token_bucket.tokens_per_fill = ''
             },
+
+            isFuseOpen(subset) {
+                var result = false
+                if (subset.trafficPolicy && (subset.trafficPolicy.connectionPool || subset.trafficPolicy.outlierDetection)) {
+                    result = true
+                } 
+                return result
+            },
+
             getPods() {
                 var _this = this
                 var url = '/pods?clusterId=' + _this.clusterId + '&namespace=default&deployment='
@@ -1050,6 +1144,7 @@
                 _this.$axios.get(url).then(successResponse => {
                     if (successResponse && successResponse.data.code === 200) {
                         _this.gateway[0] = successResponse.data.data
+                        _this.gatewayStr = JSON.stringify(_this.gateway[0].spec, null, '\t')
                     } else if (successResponse && successResponse.data.code === 400) {
                         _this.$message.warning(successResponse.data.message)
                     } else {
@@ -1093,6 +1188,7 @@
                         
                         // _this.vsConfig = JSON.parse(JSON.stringify(this.virtualService[0].spec.http[0].route))
                         _this.virtualService[0].spec.http[0].route = JSON.parse(JSON.stringify(_this.vsConfig))
+                        _this.$forceUpdate()
                         // _this.getVirtualService()
                     } else if(successResponse.data.code === 400) {
                         _this.$message.warning(successResponse.data.message)
@@ -1110,6 +1206,7 @@
                     if (successResponse.data.code === 200 && successResponse.data.data === true) {
                         _this.$message.success('Virtual Service模板配置成功！')
                         _this.getVirtualService()
+                        _this.$forceUpdate()
                     } else if(successResponse.data.code === 400) {
                         _this.$message.warning(successResponse.data.message)
                     } else {
@@ -1142,24 +1239,36 @@
                         "connectionPool": {
                             "tcp_maxConnections": '',
                             "tcp_connectTimeout": '',
+                            "http_maxRetries": '',
                             "http_http1MaxPendingRequests": '',
                             "http_maxRequestPerConnection": ''
                         },
                         "outlierDetection": {
-                            "consecutive5xxErrors": ''
+                            "consecutiveErrors": '',
+                            "baseEjectionTime": '',
+                            "consecutive5xxErrors": '',
+                            "interval": '',
+                            "maxEjectionPercent": ''
                         },
                         "loadBalancer": ''
                     }
                     policy.version = subset.labels.version
                     var trafficPolicy = subset.trafficPolicy
-                    if (trafficPolicy.connectionPool) {
+                    if (trafficPolicy && trafficPolicy.connectionPool) {
                         policy.connectionPool.tcp_maxConnections = trafficPolicy.connectionPool.tcp.maxConnections
                         policy.connectionPool.tcp_connectTimeout = trafficPolicy.connectionPool.tcp.connectTimeout.substring(0, trafficPolicy.connectionPool.tcp.connectTimeout.length - 2)
                         policy.connectionPool.http_http1MaxPendingRequests = trafficPolicy.connectionPool.http.http1MaxPendingRequests
                         policy.connectionPool.http_maxRequestPerConnection = trafficPolicy.connectionPool.http.maxRequestsPerConnection
+                        policy.connectionPool.http_maxRetries = trafficPolicy.connectionPool.http.maxRetries
                     }
-                    if (trafficPolicy.outlierDetection) policy.outlierDetection = trafficPolicy.outlierDetection
-                    if (trafficPolicy.loadBalancer) policy.loadBalancer = trafficPolicy.loadBalancer.simple
+                    if (trafficPolicy && trafficPolicy.outlierDetection) {
+                        policy.outlierDetection.consecutiveErrors = trafficPolicy.outlierDetection.consecutiveErrors
+                        policy.outlierDetection.consecutive5xxErrors = trafficPolicy.outlierDetection.consecutive5xxErrors
+                        policy.outlierDetection.baseEjectionTime = trafficPolicy.outlierDetection.baseEjectionTime.substring(0, trafficPolicy.outlierDetection.baseEjectionTime.length - 1)
+                        policy.outlierDetection.interval = trafficPolicy.outlierDetection.interval.substring(0, trafficPolicy.outlierDetection.interval.length - 1)
+                        policy.outlierDetection.maxEjectionPercent = trafficPolicy.outlierDetection.maxEjectionPercent
+                    }
+                    if (trafficPolicy && trafficPolicy.loadBalancer) policy.loadBalancer = trafficPolicy.loadBalancer.simple
                     policies[i] = policy
                 }
 
@@ -1177,7 +1286,8 @@
                 }).then(successResponse => {
                     if (successResponse.data.code === 200 && successResponse.data.data === true) {
                         _this.$message.success('配置成功！')
-                        // _this.getDestinationRule()
+                        _this.getDestinationRule()
+                        _this.$forceUpdate()
                     } else if(successResponse.data.code === 400) {
                         _this.$message.warning(successResponse.data.message)
                     } else {
@@ -1193,13 +1303,32 @@
                     if (successResponse.data.code === 200 && successResponse.data.data === true) {
                         _this.$message.success('Destination Rule模板配置成功！')
                         _this.getDestinationRule()
+                        _this.$forceUpdate()
                     } else if(successResponse.data.code === 400) {
                         _this.$message.warning(successResponse.data.message)
                     } else {
                         _this.$message.error('Destination Rule模板配置出错！')
                     }
                 })
-                _this.handleDestinationRuleConfigOpen()
+            },
+            applyTemplateFusePolicy() {
+                var _this = this
+                _this.$axios.post('destinationRule/fuse/template', {
+                    clusterId: _this.clusterId,
+                    version: _this.drTemplateFuseConfig.index,
+                    level: _this.drTemplateFuseConfig.policy
+                }).then(successResponse => {
+                    if (successResponse.data.code === 200 && successResponse.data.data === true) {
+                        _this.$message.success('模板熔断策略配置成功！')
+                        _this.getDestinationRule()
+                        _this.$forceUpdate()
+                    } else if(successResponse.data.code === 400) {
+                        _this.$message.warning(successResponse.data.message)
+                    } else {
+                        _this.$message.error('模板熔断策略配置出错！')
+                    }
+                })
+
             },
 
             getEnvoyFilters() {
